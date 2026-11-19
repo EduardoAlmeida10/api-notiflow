@@ -21,5 +21,74 @@ model Application {
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
+  templates     Template[]
+  notifications Notification[]
+
   @@map("applications")
+}
+
+model Template {
+  id            String   @id @default(uuid()) @db.Uuid
+  applicationId String   @map("application_id") @db.Uuid
+  name          String
+  subject       String
+  body          String   @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  application   Application    @relation(fields: [applicationId], references: [id])
+  notifications Notification[]
+
+  @@unique([applicationId, name])
+  @@map("templates")
+}
+
+model Notification {
+  id             String             @id @default(uuid()) @db.Uuid
+  applicationId  String             @map("application_id") @db.Uuid
+  templateId     String             @map("template_id") @db.Uuid
+  recipient      String
+  data           Json
+  status         NotificationStatus @default(PENDING)
+  idempotencyKey String?            @map("idempotency_key")
+  payloadHash    String?            @map("payload_hash")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+  sentAt         DateTime?          @map("sent_at")
+
+  application Application       @relation(fields: [applicationId], references: [id])
+  template    Template          @relation(fields: [templateId], references: [id])
+  attempts    DeliveryAttempt[]
+
+  @@unique([applicationId, idempotencyKey])
+  @@index([applicationId, status])
+  @@map("notifications")
+}
+
+model DeliveryAttempt {
+  id             String                @id @default(uuid()) @db.Uuid
+  notificationId String                @map("notification_id") @db.Uuid
+  attemptNumber  Int                   @map("attempt_number")
+  status         DeliveryAttemptStatus
+  errorCode      String?               @map("error_code")
+  errorMessage   String?               @map("error_message") @db.Text
+  attemptedAt    DateTime              @default(now()) @map("attempted_at")
+
+  notification Notification @relation(fields: [notificationId], references: [id])
+
+  @@unique([notificationId, attemptNumber])
+  @@map("delivery_attempts")
+}
+
+enum NotificationStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
+enum DeliveryAttemptStatus {
+  SUCCESS
+  TEMPORARY_FAILURE
+  PERMANENT_FAILURE
 }
