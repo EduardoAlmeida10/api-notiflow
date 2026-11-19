@@ -32,9 +32,8 @@ PostgreSQL    Redis/BullMQ → Worker → SMTP
 
 ## Pré-requisitos
 
-- Node.js e npm
-- PostgreSQL
-- Git
+[![Node.js](https://img.shields.io/badge/Node.js-22%20LTS-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![npm](https://img.shields.io/badge/npm-10%2B-CB3837?logo=npm&logoColor=white)](https://www.npmjs.com/)
 
 Redis será necessário quando a integração real com BullMQ estiver habilitada.
 
