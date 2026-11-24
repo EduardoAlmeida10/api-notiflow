@@ -96,3 +96,25 @@ npm run test:e2e
 ```
 
 Os testes de integração utilizam PostgreSQL. Configure um banco exclusivo para testes antes de executá-los.
+
+### Worker e fila de exemplo (L1)
+
+Inicie um Redis acessível localmente e configure `REDIS_HOST` e `REDIS_PORT` no `.env`; os padrões são `localhost` e `6379`. Por exemplo, com Docker instalado:
+
+```bash
+docker run --name notiflow-redis -p 6379:6379 -d redis:7
+```
+
+Em um terminal, inicie o worker independente da API:
+
+```bash
+npm run start:worker:dev
+```
+
+Em outro terminal, publique uma tarefa de exemplo:
+
+```bash
+npm run queue:example
+```
+
+O terminal do worker deve exibir a mensagem `Tarefa ... consumida: Olá do Notiflow!`. Para iniciar o worker sem modo de observação, use `npm run start:worker`. Esta fila é apenas uma demonstração: o processamento de notificações e a integração do endpoint com a fila serão implementados nas próximas tarefas.
