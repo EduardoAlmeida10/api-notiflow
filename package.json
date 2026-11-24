@@ -22,7 +22,8 @@
     "start:worker:dev": "nest start --entryFile worker --watch",
     "queue:example": "ts-node src/infrastructure/queue/enqueue-example.ts",
     "test:redis": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-redis.json --runInBand",
-    "test:smtp": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-smtp.json --runInBand"
+    "test:smtp": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-smtp.json --runInBand",
+    "test:delivery": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-delivery.json --runInBand"
   },
   "dependencies": {
     "@nestjs/bullmq": "^12.0.2",
