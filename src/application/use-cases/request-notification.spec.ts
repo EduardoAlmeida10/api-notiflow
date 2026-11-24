@@ -69,6 +69,9 @@ describe('RequestNotification', () => {
     };
 
     notificationRepository = {
+      async claimPending() {
+        return null;
+      },
       async create(data) {
         const notification = new Notification(
           randomUUID(),
