@@ -28,7 +28,7 @@ Prisma     NotificationQueue
 PostgreSQL    Redis/BullMQ → Worker → SMTP
 ```
 
-> **Estado atual:** a API aceita solicitações de notificações e as coloca na fila. O worker preenche os templates, envia por SMTP e registra as tentativas. Retry, idempotência da solicitação e recuperação confiável ainda estão previstos.
+> **Estado atual:** a API aceita solicitações de notificações e as coloca na fila. O worker preenche os templates, envia por SMTP e registra as tentativas. O worker repete falhas temporárias com limite e backoff; idempotência da solicitação e recuperação confiável ainda estão previstas.
 
 ## Pré-requisitos
 
@@ -147,11 +147,18 @@ Para verificar o adaptador com um servidor SMTP local criado pelo próprio teste
 npm run test:smtp
 ```
 
-O adaptador propaga falhas de envio. O worker utiliza o adaptador para enviar notificações; a classificação das falhas e as novas tentativas serão tratadas na L6.
+O adaptador propaga falhas de envio. O worker utiliza o adaptador para enviar notificações e classifica falhas SMTP para decidir se deve tentar novamente.
 
 
 ### Processamento de notificações (L5)
 
 Configure `DATABASE_URL`, Redis e as variáveis SMTP antes de iniciar a API e o worker. Cada tarefa pendente é reservada, o template é preenchido e o envio é tentado. O resultado é registrado na tentativa e no status da notificação. Para testar o fluxo completo com PostgreSQL e Redis de teste configurados, execute `npm run test:delivery`; o teste inicia seu próprio servidor SMTP local.
 
-Nesta etapa não há novas tentativas automáticas. Falhas de template são registradas como permanentes; outras falhas recebem classificação provisória de falha temporária, até a L6. Uma interrupção durante o processamento ou uma falha ao registrar o resultado pode deixar a notificação em `PROCESSING`; a recuperação segura e a confirmação de entrega ainda não estão implementadas.
+Uma interrupção durante o processamento ou uma falha ao registrar o resultado pode deixar a notificação em `PROCESSING`; a recuperação segura e a confirmação de entrega ainda não estão implementadas.
+
+
+### Novas tentativas de envio (L6)
+
+Falhas SMTP com respostas 4xx e erros conhecidos de conexão são tratadas como temporárias. Respostas 5xx, templates inválidos e erros não classificados encerram o processamento como falhas permanentes. O BullMQ tenta novamente as falhas temporárias com espera exponencial, começando em `NOTIFICATION_BACKOFF_MS` (padrão: 1000 ms), até `NOTIFICATION_MAX_ATTEMPTS` tentativas totais (padrão: 3). Cada tentativa é registrada; ao esgotar o limite, a notificação fica `FAILED`.
+
+O SMTP pode aceitar uma mensagem antes de uma falha de conexão impedir a confirmação. Repetir nesse caso pode produzir uma mensagem duplicada. O mecanismo atual também não recupera automaticamente notificações interrompidas em `PROCESSING`; a garantia de entrega e a reconciliação exigem trabalho posterior.
