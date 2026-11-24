@@ -118,3 +118,15 @@ npm run queue:example
 ```
 
 O terminal do worker deve exibir a mensagem `Tarefa ... consumida: Olá do Notiflow!`. Para iniciar o worker sem modo de observação, use `npm run start:worker`. Esta fila é apenas uma demonstração: o processamento de notificações e a integração do endpoint com a fila serão implementados nas próximas tarefas.
+
+### Adaptador de fila de notificações (L2)
+
+O adaptador BullMQ publica na fila `notifications` uma tarefa `send-notification`, identificada pelo ID da notificação e contendo `{ notificationId }`. A rota de notificações permanece desabilitada na aplicação principal até que o processamento de envio esteja disponível.
+
+Para testar o adaptador com um Redis de teste ativo, configure `REDIS_HOST` e `REDIS_PORT` e execute:
+
+```bash
+npm run test:redis
+```
+
+A publicação pode ter resultado incerto se a conexão falhar após o Redis receber a tarefa; idempotência da solicitação e recuperação confiável de publicações continuam previstas para etapas posteriores.
