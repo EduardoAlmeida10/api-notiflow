@@ -5,7 +5,7 @@ import {
   EXAMPLE_JOB,
   EXAMPLE_QUEUE,
   redisConnection,
-} from '../infrastructure/queue/redis.config';
+} from '../config/redis.config';
 
 async function main() {
   const queue = new Queue(EXAMPLE_QUEUE, {

@@ -4,8 +4,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import {
   EXAMPLE_QUEUE,
   redisConnection,
-} from '../infrastructure/queue/redis.config';
-import { ExampleProcessor } from './example.processor';
+} from '../infrastructure/config/redis.config';
+import { ExampleProcessor } from '../adapters/inbound/queue/example.processor';
 
 @Module({
   imports: [

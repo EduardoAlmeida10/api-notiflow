@@ -4,7 +4,7 @@ import { Job } from 'bullmq';
 import {
   EXAMPLE_JOB,
   EXAMPLE_QUEUE,
-} from '../infrastructure/queue/redis.config';
+} from '../../../infrastructure/config/redis.config';
 
 @Processor(EXAMPLE_QUEUE)
 export class ExampleProcessor extends WorkerHost {
