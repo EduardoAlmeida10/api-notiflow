@@ -22,9 +22,10 @@ import { NotificationController } from '../adapters/inbound/http/notification.co
 
 import { AuthenticationModule } from './authentication.module';
 import { PersistenceModule } from './persistence.module';
+import { NotificationQueueModule } from './notification-queue.module';
 
 @Module({
-  imports: [AuthenticationModule, PersistenceModule],
+  imports: [AuthenticationModule, PersistenceModule, NotificationQueueModule],
   controllers: [NotificationController],
   providers: [
     {
