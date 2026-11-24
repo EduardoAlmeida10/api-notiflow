@@ -21,7 +21,8 @@
     "start:worker": "nest start --entryFile worker",
     "start:worker:dev": "nest start --entryFile worker --watch",
     "queue:example": "ts-node src/infrastructure/queue/enqueue-example.ts",
-    "test:redis": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-redis.json --runInBand"
+    "test:redis": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-redis.json --runInBand",
+    "test:smtp": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-smtp.json --runInBand"
   },
   "dependencies": {
     "@nestjs/bullmq": "^12.0.2",
@@ -53,6 +54,7 @@
     "@types/node": "^24.0.0",
     "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.23.1",
+    "@types/smtp-server": "^3.5.13",
     "@types/supertest": "^7.0.0",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
@@ -60,6 +62,7 @@
     "globals": "^17.0.0",
     "jest": "^30.0.0",
     "prettier": "^3.4.2",
+    "smtp-server": "^3.21.7",
     "source-map-support": "^0.5.21",
     "supertest": "^7.0.0",
     "ts-jest": "^29.2.5",
