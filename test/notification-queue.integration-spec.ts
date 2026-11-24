@@ -43,6 +43,8 @@ describe('BullmqNotificationQueue (integração Redis)', () => {
     expect(job).toBeDefined();
     expect(job?.name).toBe(SEND_NOTIFICATION_JOB);
     expect(job?.data).toEqual({ notificationId });
+    expect(job?.opts.attempts).toBe(3);
+    expect(job?.opts.backoff).toEqual({ type: 'exponential', delay: 1000 });
     expect(await job?.getState()).toBe('waiting');
   });
 });

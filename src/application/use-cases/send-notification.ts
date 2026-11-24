@@ -1,5 +1,6 @@
 import { DeliveryAttemptStatus } from '../../domain/delivery-attempt';
 import { NotificationStatus } from '../../domain/notification';
+import { DeliveryFailure } from '../errors/delivery.errors';
 import type { DeliveryAttemptRepository } from '../ports/delivery-attempt.repository';
 import type { NotificationRepository } from '../ports/notification.repository';
 import type { NotificationSender } from '../ports/notification-sender';
@@ -18,7 +19,7 @@ export class SendNotification {
     private readonly renderer: TemplateRenderer,
   ) {}
 
-  async execute(notificationId: string): Promise<void> {
+  async execute(notificationId: string, maxAttempts = 1): Promise<void> {
     const notification = await this.notifications.claimPending(notificationId);
     if (!notification) return;
 
@@ -44,12 +45,13 @@ export class SendNotification {
       const invalidTemplate =
         error instanceof TemplateVariablesError ||
         error instanceof TemplateNotFoundForDeliveryError;
+      const retryable = error instanceof DeliveryFailure && error.retryable;
       await this.attempts.create({
         notificationId: notification.id,
         attemptNumber,
-        status: invalidTemplate
-          ? DeliveryAttemptStatus.PERMANENT_FAILURE
-          : DeliveryAttemptStatus.TEMPORARY_FAILURE,
+        status: retryable
+          ? DeliveryAttemptStatus.TEMPORARY_FAILURE
+          : DeliveryAttemptStatus.PERMANENT_FAILURE,
         errorCode: invalidTemplate ? 'INVALID_TEMPLATE' : 'DELIVERY_ERROR',
         errorMessage: invalidTemplate
           ? error.message
@@ -57,9 +59,11 @@ export class SendNotification {
       });
       await this.notifications.updateStatus(
         notification.id,
-        NotificationStatus.FAILED,
+        retryable && attemptNumber < maxAttempts
+          ? NotificationStatus.PENDING
+          : NotificationStatus.FAILED,
       );
-      throw error;
+      throw new DeliveryFailure(retryable);
     }
 
     await this.attempts.create({

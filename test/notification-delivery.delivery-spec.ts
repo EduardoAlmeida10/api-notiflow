@@ -21,6 +21,7 @@ describe('Fluxo de envio (integração)', () => {
   let prisma: PrismaService;
   let queue: Queue;
   let message = '';
+  const smtpAttempts = new Map<string, number>();
   const applicationId = randomUUID();
   const apiKey = `nf_${randomBytes(32).toString('hex')}`;
   const notificationIds: string[] = [];
@@ -30,6 +31,26 @@ describe('Fluxo de envio (integração)', () => {
     smtp = new SMTPServer({
       authOptional: true,
       disabledCommands: ['STARTTLS', 'AUTH'],
+      onRcptTo(address, _session, callback) {
+        const count = (smtpAttempts.get(address.address) ?? 0) + 1;
+        smtpAttempts.set(address.address, count);
+        if (address.address === 'permanente@example.com') {
+          callback(
+            Object.assign(new Error('Rejeitado'), { responseCode: 550 }),
+          );
+          return;
+        }
+        if (
+          address.address === 'sempre-temporario@example.com' ||
+          (address.address === 'temporario@example.com' && count <= 2)
+        ) {
+          callback(
+            Object.assign(new Error('Indisponível'), { responseCode: 451 }),
+          );
+          return;
+        }
+        callback();
+      },
       onData(stream, _session, callback) {
         message = '';
         stream.on('data', (chunk: Buffer) => {
@@ -43,6 +64,8 @@ describe('Fluxo de envio (integração)', () => {
     process.env.SMTP_PORT = String((smtp.server.address() as AddressInfo).port);
     process.env.SMTP_SECURE = 'false';
     process.env.SMTP_FROM = 'origem@example.com';
+    process.env.NOTIFICATION_MAX_ATTEMPTS = '3';
+    process.env.NOTIFICATION_BACKOFF_MS = '50';
     delete process.env.SMTP_USER;
     delete process.env.SMTP_PASSWORD;
     app = await NestFactory.create(AppModule, { logger: false });
@@ -168,4 +191,44 @@ describe('Fluxo de envio (integração)', () => {
       ).status,
     ).toBe('PROCESSING');
   });
+
+  it.each([
+    [
+      'temporario@example.com',
+      'SENT',
+      ['TEMPORARY_FAILURE', 'TEMPORARY_FAILURE', 'SUCCESS'],
+    ],
+    [
+      'sempre-temporario@example.com',
+      'FAILED',
+      ['TEMPORARY_FAILURE', 'TEMPORARY_FAILURE', 'TEMPORARY_FAILURE'],
+    ],
+    ['permanente@example.com', 'FAILED', ['PERMANENT_FAILURE']],
+  ])(
+    'aplica retry para %s e termina em %s',
+    async (recipient, status, expectedAttempts) => {
+      const response = await request(app.getHttpServer() as Server)
+        .post('/api/notifications')
+        .set('X-API-Key', apiKey)
+        .send({ templateId, recipient, data: { nome: 'Teste' } })
+        .expect(202);
+      const id = (response.body as { id: string }).id;
+      notificationIds.push(id);
+      await waitFor(id, status);
+      const attempts = await prisma.deliveryAttempt.findMany({
+        where: { notificationId: id },
+        orderBy: { attemptNumber: 'asc' },
+      });
+      expect(attempts.map((item) => item.status)).toEqual(expectedAttempts);
+      expect(smtpAttempts.get(recipient)).toBe(expectedAttempts.length);
+      if (attempts.length === 3) {
+        expect(
+          attempts[1].attemptedAt.getTime() - attempts[0].attemptedAt.getTime(),
+        ).toBeGreaterThanOrEqual(40);
+        expect(
+          attempts[2].attemptedAt.getTime() - attempts[1].attemptedAt.getTime(),
+        ).toBeGreaterThanOrEqual(90);
+      }
+    },
+  );
 });
