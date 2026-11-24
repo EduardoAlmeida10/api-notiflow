@@ -1,6 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Inject } from '@nestjs/common';
-import { Job } from 'bullmq';
+import { Job, UnrecoverableError } from 'bullmq';
+import { DeliveryFailure } from '../../../application/errors/delivery.errors';
 import { SendNotification } from '../../../application/use-cases/send-notification';
 import {
   NOTIFICATION_QUEUE_NAME,
@@ -24,6 +25,16 @@ export class NotificationProcessor extends WorkerHost {
     ) {
       throw new Error('Tarefa de notificação inválida.');
     }
-    await this.sendNotification.execute(job.data.notificationId);
+    try {
+      await this.sendNotification.execute(
+        job.data.notificationId,
+        job.opts.attempts ?? 1,
+      );
+    } catch (error: unknown) {
+      if (error instanceof DeliveryFailure && !error.retryable) {
+        throw new UnrecoverableError(error.message);
+      }
+      throw error;
+    }
   }
 }

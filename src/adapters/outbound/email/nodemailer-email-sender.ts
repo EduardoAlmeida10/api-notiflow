@@ -1,4 +1,5 @@
 import { createTransport, type Transporter } from 'nodemailer';
+import { DeliveryFailure } from '../../../application/errors/delivery.errors';
 import type {
   EmailMessage,
   NotificationSender,
@@ -18,11 +19,37 @@ export class NodemailerEmailSender implements NotificationSender {
   }
 
   async send(message: EmailMessage): Promise<void> {
-    await this.transporter.sendMail({
-      from: this.config.from,
-      to: message.recipient,
-      subject: message.subject,
-      text: message.body,
-    });
+    try {
+      await this.transporter.sendMail({
+        from: this.config.from,
+        to: message.recipient,
+        subject: message.subject,
+        text: message.body,
+      });
+    } catch (error: unknown) {
+      const details =
+        typeof error === 'object' && error !== null
+          ? (error as { responseCode?: unknown; code?: unknown })
+          : {};
+      const responseCode =
+        typeof details.responseCode === 'number'
+          ? details.responseCode
+          : undefined;
+      const temporaryCodes = new Set([
+        'ECONNECTION',
+        'ETIMEDOUT',
+        'ESOCKET',
+        'ECONNRESET',
+        'ECONNREFUSED',
+        'EAI_AGAIN',
+        'EDNS',
+      ]);
+      const retryable =
+        responseCode !== undefined
+          ? responseCode >= 400 && responseCode < 500
+          : typeof details.code === 'string' &&
+            temporaryCodes.has(details.code);
+      throw new DeliveryFailure(retryable);
+    }
   }
 }
