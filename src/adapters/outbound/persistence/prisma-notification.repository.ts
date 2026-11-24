@@ -60,6 +60,20 @@ export class PrismaNotificationRepository implements NotificationRepository {
     return notification ? this.toDomain(notification) : null;
   }
 
+  async claimPending(id: string): Promise<Notification | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.notification.updateMany({
+        where: { id, status: NotificationStatus.PENDING },
+        data: { status: NotificationStatus.PROCESSING },
+      });
+      if (claimed.count === 0) return null;
+      const notification = await tx.notification.findUniqueOrThrow({
+        where: { id },
+      });
+      return this.toDomain(notification);
+    });
+  }
+
   async updateStatus(
     id: string,
     status: NotificationStatus,

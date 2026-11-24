@@ -17,6 +17,8 @@ export interface NotificationRepository {
 
   findById(id: string, applicationId: string): Promise<Notification | null>;
 
+  claimPending(id: string): Promise<Notification | null>;
+
   findByIdempotencyKey(
     applicationId: string,
     idempotencyKey: string,
