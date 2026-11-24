@@ -130,3 +130,9 @@ npm run test:redis
 ```
 
 A publicação pode ter resultado incerto se a conexão falhar após o Redis receber a tarefa; idempotência da solicitação e recuperação confiável de publicações continuam previstas para etapas posteriores.
+
+### Preenchimento de templates (L3)
+
+O `TemplateRenderer` preenche assunto e corpo usando variáveis como `{{nome}}` ou `{{ nome }}`. Os nomes podem conter letras, números e `_`; os valores aceitos são texto, números finitos e booleanos. Valores ausentes, nulos ou de outros tipos geram `TemplateVariablesError` com os nomes das variáveis afetadas. Valores vazios, zero e `false` são aceitos.
+
+O preenchimento é uma substituição literal, sem escape de HTML. A integração com o processamento e envio da notificação será feita na L5.
