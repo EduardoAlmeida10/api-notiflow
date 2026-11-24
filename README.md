@@ -162,3 +162,16 @@ Uma interrupção durante o processamento ou uma falha ao registrar o resultado 
 Falhas SMTP com respostas 4xx e erros conhecidos de conexão são tratadas como temporárias. Respostas 5xx, templates inválidos e erros não classificados encerram o processamento como falhas permanentes. O BullMQ tenta novamente as falhas temporárias com espera exponencial, começando em `NOTIFICATION_BACKOFF_MS` (padrão: 1000 ms), até `NOTIFICATION_MAX_ATTEMPTS` tentativas totais (padrão: 3). Cada tentativa é registrada; ao esgotar o limite, a notificação fica `FAILED`.
 
 O SMTP pode aceitar uma mensagem antes de uma falha de conexão impedir a confirmação. Repetir nesse caso pode produzir uma mensagem duplicada. O mecanismo atual também não recupera automaticamente notificações interrompidas em `PROCESSING`; a garantia de entrega e a reconciliação exigem trabalho posterior.
+
+### Provedor simulado (L7)
+
+Por padrão, `EMAIL_PROVIDER=smtp` usa o servidor SMTP configurado. Para testar sem enviar e-mails, configure o worker com:
+
+```env
+EMAIL_PROVIDER=simulated
+SIMULATED_DELIVERY_MODE=success
+```
+
+O modo pode ser `success`, `temporary_failure` ou `permanent_failure`. Altere a configuração e reinicie o worker para trocar de modo. A simulação de falha temporária falha em todas as tentativas até atingir o limite configurado; a permanente termina na primeira tentativa. O modo `success` registra a notificação como `SENT`, mas **não envia nem entrega e-mail**. Use-o somente em ambiente de teste.
+
+Para testar os três modos com PostgreSQL e Redis de teste configurados, execute `npm run test:simulated`. O teste não utiliza SMTP nem envia mensagens reais.
