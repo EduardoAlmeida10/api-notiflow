@@ -14,7 +14,7 @@ O **Notiflow** é um serviço reutilizável de notificações por e-mail, desenv
 
 ## Arquitetura
 
-O projeto utiliza **arquitetura hexagonal (Ports and Adapters)**, separando domínio, casos de uso e infraestrutura. A API é desenvolvida em **NestJS**, com **PostgreSQL e Prisma** para persistência. O processamento assíncrono é planejado com **Redis e BullMQ**, por meio de um worker responsável pelo envio SMTP.
+O projeto utiliza **arquitetura hexagonal (Ports and Adapters)**, separando domínio, casos de uso e infraestrutura. A API é desenvolvida em **NestJS**, com **PostgreSQL e Prisma** para persistência. O processamento assíncrono usa **Redis e BullMQ**, por meio de um worker responsável pelo envio SMTP.
 
 ```text
 Aplicações consumidoras
@@ -28,14 +28,14 @@ Prisma     NotificationQueue
 PostgreSQL    Redis/BullMQ → Worker → SMTP
 ```
 
-> **Estado atual:** autenticação por API Key e cadastro de templates implementados. A solicitação de notificações já foi desenvolvida e testada com fila simulada, mas o endpoint ainda depende da integração real com BullMQ para ser habilitado na aplicação principal.
+> **Estado atual:** a API aceita solicitações de notificações e as coloca na fila. O worker preenche os templates, envia por SMTP e registra as tentativas. Retry, idempotência da solicitação e recuperação confiável ainda estão previstos.
 
 ## Pré-requisitos
 
 [![Node.js](https://img.shields.io/badge/Node.js-22%20LTS-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![npm](https://img.shields.io/badge/npm-10%2B-CB3837?logo=npm&logoColor=white)](https://www.npmjs.com/)
 
-Redis será necessário quando a integração real com BullMQ estiver habilitada.
+Redis e PostgreSQL são necessários para executar a API e o worker.
 
 ## Como executar
 
@@ -86,7 +86,7 @@ curl -X POST http://localhost:3000/api/templates \
   -d '{"name":"pedido_confirmado","subject":"Pedido confirmado","body":"Olá, {{nome}}!"}'
 ```
 
-**Solicitar uma notificação — `POST /api/notifications`:** previsto para disponibilização após a integração da fila real. Receberá `templateId`, `recipient` e `data`, retornando `202 Accepted` quando a solicitação for aceita para processamento.
+**Solicitar uma notificação — `POST /api/notifications`:** recebe `templateId`, `recipient` e `data`, retornando `202 Accepted` quando a solicitação for aceita para processamento. O retorno não confirma a entrega.
 
 ## Testes
 
@@ -117,11 +117,11 @@ Em outro terminal, publique uma tarefa de exemplo:
 npm run queue:example
 ```
 
-O terminal do worker deve exibir a mensagem `Tarefa ... consumida: Olá do Notiflow!`. Para iniciar o worker sem modo de observação, use `npm run start:worker`. Esta fila é apenas uma demonstração: o processamento de notificações e a integração do endpoint com a fila serão implementados nas próximas tarefas.
+O terminal do worker deve exibir a mensagem `Tarefa ... consumida: Olá do Notiflow!`. Para iniciar o worker sem modo de observação, use `npm run start:worker`. Esta fila é apenas uma demonstração; o mesmo worker também processa a fila de notificações.
 
 ### Adaptador de fila de notificações (L2)
 
-O adaptador BullMQ publica na fila `notifications` uma tarefa `send-notification`, identificada pelo ID da notificação e contendo `{ notificationId }`. A rota de notificações permanece desabilitada na aplicação principal até que o processamento de envio esteja disponível.
+O adaptador BullMQ publica na fila `notifications` uma tarefa `send-notification`, identificada pelo ID da notificação e contendo `{ notificationId }`. O worker consome essa fila para realizar o envio.
 
 Para testar o adaptador com um Redis de teste ativo, configure `REDIS_HOST` e `REDIS_PORT` e execute:
 
@@ -135,7 +135,7 @@ A publicação pode ter resultado incerto se a conexão falhar após o Redis rec
 
 O `TemplateRenderer` preenche assunto e corpo usando variáveis como `{{nome}}` ou `{{ nome }}`. Os nomes podem conter letras, números e `_`; os valores aceitos são texto, números finitos e booleanos. Valores ausentes, nulos ou de outros tipos geram `TemplateVariablesError` com os nomes das variáveis afetadas. Valores vazios, zero e `false` são aceitos.
 
-O preenchimento é uma substituição literal, sem escape de HTML. A integração com o processamento e envio da notificação será feita na L5.
+O preenchimento é uma substituição literal, sem escape de HTML. O worker utiliza essa regra durante o processamento.
 
 ### Envio de e-mail por SMTP (L4)
 
@@ -147,4 +147,11 @@ Para verificar o adaptador com um servidor SMTP local criado pelo próprio teste
 npm run test:smtp
 ```
 
-O adaptador propaga falhas de envio. Sua integração ao processamento de notificações será feita na L5; a classificação das falhas e as tentativas serão tratadas na L6.
+O adaptador propaga falhas de envio. O worker utiliza o adaptador para enviar notificações; a classificação das falhas e as novas tentativas serão tratadas na L6.
+
+
+### Processamento de notificações (L5)
+
+Configure `DATABASE_URL`, Redis e as variáveis SMTP antes de iniciar a API e o worker. Cada tarefa pendente é reservada, o template é preenchido e o envio é tentado. O resultado é registrado na tentativa e no status da notificação. Para testar o fluxo completo com PostgreSQL e Redis de teste configurados, execute `npm run test:delivery`; o teste inicia seu próprio servidor SMTP local.
+
+Nesta etapa não há novas tentativas automáticas. Falhas de template são registradas como permanentes; outras falhas recebem classificação provisória de falha temporária, até a L6. Uma interrupção durante o processamento ou uma falha ao registrar o resultado pode deixar a notificação em `PROCESSING`; a recuperação segura e a confirmação de entrega ainda não estão implementadas.
