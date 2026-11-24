@@ -136,3 +136,15 @@ A publicação pode ter resultado incerto se a conexão falhar após o Redis rec
 O `TemplateRenderer` preenche assunto e corpo usando variáveis como `{{nome}}` ou `{{ nome }}`. Os nomes podem conter letras, números e `_`; os valores aceitos são texto, números finitos e booleanos. Valores ausentes, nulos ou de outros tipos geram `TemplateVariablesError` com os nomes das variáveis afetadas. Valores vazios, zero e `false` são aceitos.
 
 O preenchimento é uma substituição literal, sem escape de HTML. A integração com o processamento e envio da notificação será feita na L5.
+
+### Envio de e-mail por SMTP (L4)
+
+O adaptador `NodemailerEmailSender` envia o assunto e o corpo em texto simples ao destinatário por SMTP. Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE` e `SMTP_FROM` no `.env`. Se o servidor exigir autenticação, informe também `SMTP_USER` e `SMTP_PASSWORD`. Use `SMTP_SECURE=true` para SMTP com TLS desde a conexão (por exemplo, porta 465); com `false`, o Nodemailer pode negociar STARTTLS quando o servidor oferecer suporte.
+
+Para verificar o adaptador com um servidor SMTP local criado pelo próprio teste:
+
+```bash
+npm run test:smtp
+```
+
+O adaptador propaga falhas de envio. Sua integração ao processamento de notificações será feita na L5; a classificação das falhas e as tentativas serão tratadas na L6.
