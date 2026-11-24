@@ -7,6 +7,7 @@ import type { DeliveryAttemptRepository } from '../ports/delivery-attempt.reposi
 import type { NotificationSender } from '../ports/notification-sender';
 import { TemplateRenderer } from '../services/template-renderer';
 import { SendNotification } from './send-notification';
+import { DeliveryFailure } from '../errors/delivery.errors';
 
 describe('SendNotification', () => {
   const notification = new Notification(
@@ -116,12 +117,39 @@ describe('SendNotification', () => {
   });
 
   it('registra falha do envio sem expor detalhes do provedor', async () => {
-    sendMock.mockRejectedValue(new Error('informação interna'));
+    sendMock.mockRejectedValue(new DeliveryFailure(true, 'informação interna'));
     await expect(useCase.execute('id')).rejects.toThrow();
     expect(attempts.create).toHaveBeenCalledWith(
       expect.objectContaining({
         status: DeliveryAttemptStatus.TEMPORARY_FAILURE,
         errorMessage: 'Falha ao processar ou enviar a notificação.',
+      }),
+    );
+    expect(notifications.updateStatus).toHaveBeenCalledWith(
+      'id',
+      NotificationStatus.FAILED,
+    );
+  });
+
+  it('recoloca em pendente uma falha temporária com tentativas restantes', async () => {
+    sendMock.mockRejectedValue(new DeliveryFailure(true));
+    await expect(useCase.execute('id', 3)).rejects.toBeInstanceOf(
+      DeliveryFailure,
+    );
+    expect(notifications.updateStatus).toHaveBeenCalledWith(
+      'id',
+      NotificationStatus.PENDING,
+    );
+  });
+
+  it('encerra falha permanente mesmo quando há tentativas restantes', async () => {
+    sendMock.mockRejectedValue(new DeliveryFailure(false));
+    await expect(useCase.execute('id', 3)).rejects.toBeInstanceOf(
+      DeliveryFailure,
+    );
+    expect(attempts.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: DeliveryAttemptStatus.PERMANENT_FAILURE,
       }),
     );
     expect(notifications.updateStatus).toHaveBeenCalledWith(
